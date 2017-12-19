@@ -210,12 +210,14 @@ public class DiseaseCountService {
         Map<String,String> nowDataMap = getNeedDateStr("1");
         Map<String,String> lastDataMap = getNeedDateStr("0");
         String hql ="select new com.dchealth.VO.DiseaseMonthCount(d.name,d.dcode,count(f.id) as totalCount," +
-                "(select count(yf.id) from YunFolder as yf,YunPatient as yp where yf.diagnosisCode = d.dcode and " +
-                "yf.patientId = yp.id and yp.createDate>='"+nowDataMap.get("firstDay")+"' and yp.createDate<='"+nowDataMap.get("lastDay")+"' " +
-                "group by yf.diagnosisCode) as nowMonthCount,(select count(yf.id) from YunFolder as yf,YunPatient as yp where yf.diagnosisCode = d.dcode and " +
-                "yf.patientId = yp.id and yp.createDate>='"+lastDataMap.get("firstDay")+"' and yp.createDate<='"+lastDataMap.get("lastDay")+"' " +
+                "(select count(yf.id) from YunFolder as yf,YunPatient as yp,YunUsers as u where yf.diagnosisCode = d.dcode and " +
+                "yf.patientId = yp.id and yp.doctorId = u.id and u.rolename!='FORM_USER' " +
+                " and yp.createDate>='"+nowDataMap.get("firstDay")+"' and yp.createDate<='"+nowDataMap.get("lastDay")+"' " +
+                "group by yf.diagnosisCode) as nowMonthCount,(select count(yf.id) from YunFolder as yf,YunPatient as yp,YunUsers as u where yf.diagnosisCode = d.dcode and " +
+                "yf.patientId = yp.id and yp.doctorId = u.id and u.rolename!='FORM_USER'" +
+                "and yp.createDate>='"+lastDataMap.get("firstDay")+"' and yp.createDate<='"+lastDataMap.get("lastDay")+"' " +
                 "group by yf.diagnosisCode) as lastMonthCount) from YunDiseaseList as d,YunFolder as f,YunPatient as p" +
-                " where d.dcode = f.diagnosisCode and f.patientId = p.id  ";
+                " where d.dcode = f.diagnosisCode and f.patientId = p.id  and  exists(select 1 from YunUsers where id = p.doctorId and rolename!='FORM_USER')";
         if(!StringUtils.isEmpty(name)){
             hql += " and d.name like '%"+name+"%'";
         }
