@@ -593,4 +593,40 @@ public class YunUserService {
         return list;
     }
 
+    /**
+     * 更新用户
+     * @param yunUsers
+     * @return
+     */
+    @POST
+    @Transactional
+    @Path("audit-user")
+    public Response auditYunUser(YunUsers yunUsers) throws Exception {
+        String id = yunUsers.getId();
+        if(id==null||"".equals(id)){
+            System.out.println(id);
+            throw new Exception("获取不到原信息的ID");
+        }
+        YunUsers dbUsers = userFacade.get(YunUsers.class,id);
+        String loginFlags = dbUsers.getLoginFlags();
+        dbUsers.setLoginFlags(yunUsers.getLoginFlags());
+        dbUsers.setRolename(yunUsers.getRolename());
+        YunUsers users = userFacade.merge(dbUsers);
+        if(!users.getLoginFlags().equals(loginFlags) && "R".equals(users.getLoginFlags())){//表示审核通过
+            String mailInfo = "您好:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;您的账号"+yunUsers.getUserName()+"已通过审核，您可以进行登录了，登录连接<a href=\"http://nrdrs.org\">http://nrdrs.org</a>";
+            mailSendFacade.sendMail("用户审核",users.getEmail(),mailInfo);
+            mailSendFacade.sendMessageToUser(yunUsers.getId(),"用户审核",mailInfo);
+        }
+        String hql = "delete from RoleVsUser as r where r.userId='"+yunUsers.getId()+"'" ;
+        userFacade.excHql(hql);
+        String roleHql = " from RoleDict where code = '"+yunUsers.getRolename()+"'";
+        List<RoleDict> roleDicts = userFacade.createQuery(RoleDict.class,roleHql,new ArrayList<Object>()).getResultList();
+        for(RoleDict roleDict:roleDicts){
+            RoleVsUser roleVsUser = new RoleVsUser();
+            roleVsUser.setUserId(yunUsers.getId());
+            roleVsUser.setRoleId(roleDict.getId());
+            userFacade.merge(roleVsUser);
+        }
+        return Response.status(Response.Status.OK).entity(users).build();
+    }
 }

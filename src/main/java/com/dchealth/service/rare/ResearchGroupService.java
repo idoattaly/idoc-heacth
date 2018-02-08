@@ -760,7 +760,7 @@ public class ResearchGroupService {
                 "ResearchGroup a,ResearchGroupVsHospital h,ResearchGroupVsUser c,HospitalDict d,YunUsers u,YunPatient p,YunFolder f,YunDiseaseList l " +
                 "where a.id=h.groupId and a.researchDiseaseId = l.id and a.id=c.groupId and h.hospitalId = d.id and " +
                 "c.userId=u.id and d.hospitalName = u.hospitalName and u.hospitalName = t.hospitalName and u.rolename <> 'FORM_USER' and u.id=p.doctorId and p.id = f.patientId and f.diagnosisCode = l.dcode and a.id='"+groupId+"') as num) from " +
-                "ResearchGroup g,ResearchGroupVsHospital vs,HospitalDict t where g.id=vs.groupId and vs.hospitalId= t.id and " +
+                "ResearchGroup g,ResearchGroupVsHospital vs,HospitalDict t where g.id=vs.groupId and vs.hospitalId= t.id and g.status<>'-1' and " +
                 "g.id='"+groupId+"' group by t.hospitalName order by num desc";
         return baseFacade.createQuery(HospitalsFoldersVo.class,hql,new ArrayList<>()).getResultList();
     }
@@ -799,8 +799,8 @@ public class ResearchGroupService {
     @Path("get-groups-folders")
     public List<GroupsFoldersVo> getGroupsFolders(@QueryParam("diagnosisCode") String diagnosisCode){
         String hql="select new com.dchealth.VO.GroupsFoldersVo(g.id,g.researchGroupName, (select count(f.id) from ResearchGroup r,ResearchGroupVsUser u,YunUsers a,YunPatient p,YunFolder f where" +
-                " r.researchGroupName= g.researchGroupName and r.id=u.groupId and u.userId=a.id and a.rolename <> 'FORM_USER' and a.id=p.doctorId and p.id=f.patientId and f.diagnosisCode='"+diagnosisCode+"') as num) " +
-                "from ResearchGroup g,YunDiseaseList l where g.researchDiseaseId=l.id and l.dcode='"+diagnosisCode+"'  order by num desc";
+                " r.researchGroupName= g.researchGroupName and r.id=u.groupId and u.userId=a.id and a.rolename <> 'FORM_USER' and a.id=p.doctorId and p.id=f.patientId and r.status<>'-1' and f.diagnosisCode='"+diagnosisCode+"') as num) " +
+                "from ResearchGroup g,YunDiseaseList l where g.researchDiseaseId=l.id and g.status<>'-1' and l.dcode='"+diagnosisCode+"'  order by num desc";
         return baseFacade.createQuery(GroupsFoldersVo.class,hql,new ArrayList<>()).getResultList();
     }
 
@@ -815,8 +815,8 @@ public class ResearchGroupService {
         String hql="select new com.dchealth.VO.GroupUsersFoldersVo(c.id,c.userId,c.userName,l.name,l.dcode,c.hospitalName,(select count(DISTINCT f.id) from " +
                 "ResearchGroup a,ResearchGroupVsUser b,YunUsers u,YunPatient p,YunFolder f,YunDiseaseList l " +
                 "where a.id=b.groupId and b.userId=u.id and u.userName=c.userName and a.researchDiseaseId = l.id and " +
-                "u.id=p.doctorId and p.id = f.patientId and f.diagnosisCode = l.dcode and a.id='"+groupId+"') as num) from " +
-                "ResearchGroup g,ResearchGroupVsUser vs,YunUsers c,YunDiseaseList l where c.rolename <> 'FORM_USER' and g.id=vs.groupId and g.researchDiseaseId=l.id and vs.userId=c.id and " +
+                "u.id=p.doctorId and p.id = f.patientId and f.diagnosisCode = l.dcode and a.status<>'-1' and a.id='"+groupId+"') as num) from " +
+                "ResearchGroup g,ResearchGroupVsUser vs,YunUsers c,YunDiseaseList l where c.rolename <> 'FORM_USER' and g.id=vs.groupId and g.researchDiseaseId=l.id and vs.userId=c.id and g.status<>'-1' and " +
                 "g.id='"+groupId+"' group by c.userName order by num desc";
         return baseFacade.createQuery(GroupUsersFoldersVo.class,hql,new ArrayList<>()).getResultList();
     }

@@ -94,6 +94,7 @@ public class DiseaseCountService {
                 sql += " and exists(select 1 from yun_user_disease_manager ym where ym.dcode = f.diagnosis_code and ym.user_id in ("+userIds+"))";
             }
         }
+        sql += " and p.doctor_id not in (select id from yun_users where rolename in ('FORM_USER','ADMINISTRATOR') and id<>'"+doctorId+"')";
         sql += " and f.create_date BETWEEN date_sub(date_sub(date_format(now(),'%y-%m-%d 00:00:00'),interval extract( day from now())-1 day),interval 5 month) and NOW() " +
                 " GROUP BY f.diagnosis_code,DATE_FORMAT(f.create_date,'%Y-%m')";
         List list = baseFacade.createNativeQuery(sql).getResultList();
@@ -182,7 +183,9 @@ public class DiseaseCountService {
     public List<DiseaseShareCount> getDiseaseShareCounts(){
         List<DiseaseShareCount> diseaseShareCounts = new ArrayList<>();
         String sql = "select count(p.id),f.diagnosis_code,(select name from yun_disease_list where dcode = f.diagnosis_code)" +
-                " from yun_folder f,yun_patient p where f.patient_id = p.id and f.diagnosis_code !='' group by f.diagnosis_code";
+                " from yun_folder f,yun_patient p where f.patient_id = p.id and f.diagnosis_code !='' ";
+        sql += " and p.doctor_id not in (select id from yun_users where rolename in ('FORM_USER','ADMINISTRATOR'))";
+        sql += " group by f.diagnosis_code";
         List list = baseFacade.createNativeQuery(sql).getResultList();
         if(list!=null && !list.isEmpty()) {
             int size = list.size();
