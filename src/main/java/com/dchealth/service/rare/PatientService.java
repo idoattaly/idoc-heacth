@@ -7,10 +7,7 @@ import com.dchealth.entity.rare.YunFolder;
 import com.dchealth.entity.rare.YunFollowUp;
 import com.dchealth.entity.rare.YunPatient;
 import com.dchealth.facade.common.BaseFacade;
-import com.dchealth.util.GroupQuerySqlUtil;
-import com.dchealth.util.JSONUtil;
-import com.dchealth.util.SmsSendUtil;
-import com.dchealth.util.StringUtils;
+import com.dchealth.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,6 +95,15 @@ public class PatientService {
             hql+=" and p.email = '"+email+"'" ;
             hqlCount+=" and p.email = '"+email+"'" ;
         }
+        if(StringUtils.isEmpty(doctorId)){
+            try {
+                doctorId = UserUtils.getYunUsers().getId();
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+        hql += " and p.doctorId not in (select id from YunUsers where rolename in ('FORM_USER','ADMINISTRATOR') and id<>'"+doctorId+"')";
+        hqlCount += " and p.doctorId not in (select id from YunUsers where rolename in ('FORM_USER','ADMINISTRATOR') and id<>'"+doctorId+"')";
         hql+=" order by p.createDate desc";
         hqlCount+=" order by p.createDate desc";
         TypedQuery<PatientVo> baseFacadeQuery = baseFacade.createQuery(PatientVo.class, hql, new ArrayList<Object>());
@@ -175,6 +181,15 @@ public class PatientService {
             pfHql += " and yf.hstatus='"+hstatus+"'" ;
             hqlCount += " and yf.hstatus='"+hstatus+"'" ;
         }
+        if(StringUtils.isEmpty(doctorId)){
+            try {
+                doctorId = UserUtils.getYunUsers().getId();
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+        pfHql += " and p.doctorId not in (select id from YunUsers where rolename in ('FORM_USER','ADMINISTRATOR') and id<>'"+doctorId+"')";
+        hqlCount += " and p.doctorId not in (select id from YunUsers where rolename in ('FORM_USER','ADMINISTRATOR') and id<>'"+doctorId+"')";
         Long aLong = baseFacade.createQuery(Long.class, hqlCount, new ArrayList<Object>()).getSingleResult();
         TypedQuery<PatientFollowUpVo> pfBaseTypedQuery = baseFacade.createQuery(PatientFollowUpVo.class, pfHql, new ArrayList<Object>());
         yunPatientPage.setCounts(aLong);

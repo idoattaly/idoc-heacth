@@ -59,6 +59,7 @@ public class YunUserService {
 
     private Map<String,Integer> mobileMap = new ConcurrentHashMap<String,Integer>();
     private Map<String,Long> timeMap = new ConcurrentHashMap<String,Long>();
+    private final String _Mobile = "mobile";
 
     /**
      * 注册用户信息
@@ -77,14 +78,18 @@ public class YunUserService {
                 throw new Exception("图形验证码输入错误，请重新输入");
             }
             if(StringUtils.isEmpty(veryCode)){
-                throw new Exception("验证码不能为空，请重新输入");
+                throw new Exception("手机验证码不能为空，请重新输入");
             }
             String sessionVeryCode = request==null?"":(String) request.getSession().getAttribute(request.getSession().getId()+SmsSendUtil.register);
             if(StringUtils.isEmpty(sessionVeryCode)){
-                throw new Exception("验证码已失效，请重新获取");
+                throw new Exception("手机验证码已失效，请重新获取");
             }
             if(!veryCode.equals(sessionVeryCode)){
-                throw new Exception("验证码不正确，请重新输入");
+                throw new Exception("手机验证码不正确，请重新输入");
+            }
+            String mobile = request.getSession().getAttribute(request.getSession().getId()+_Mobile)==null?"":request.getSession().getAttribute(request.getSession().getId()+_Mobile)+"";
+            if(!mobile.equals(yunUsers.getMobile())){
+                throw new Exception("发送验证码手机号和注册手机号不一致，请重新输入");
             }
         }
         Response response = null;
@@ -96,7 +101,18 @@ public class YunUserService {
             yunUsers.setSalt(passwordAndSalt.getSalt());
             response = userFacade.mergeYunUsers(yunUsers);
         }catch (Exception e){
-            throw e;
+            String emsg = e.getMessage();
+            if(emsg.contains("yun_users_idx_user_id")){
+                throw new Exception("登陆名已存在，请重新输入");
+            }else if(emsg.contains("yun_users_idx_mobile")){
+                throw new Exception("手机号已被注册，请重新输入");
+            }else if(emsg.contains("yun_users_idx_email")){
+                throw new Exception("邮箱已被注册，请重新输入");
+            }else if(emsg.contains("yun_users_idx_practice_qualification_id")){
+                throw new Exception("职业资格证书编号已存在，请重新输入");
+            }else{
+                throw new Exception("注册异常，请重试");
+            }
         }
         request.getSession().removeAttribute(request.getSession().getId()+SmsSendUtil.register);
         request.getSession().removeAttribute(request.getSession().getId()+SmsSendUtil.pictureCode);//清除图形验证码
@@ -502,6 +518,7 @@ public class YunUserService {
             request.getSession().setAttribute(request.getSession().getId()+SmsSendUtil.register,veryCode);
             request.getSession().removeAttribute(request.getSession().getId()+SmsSendUtil.pictureCode);//清除图形验证码
             request.getSession().setAttribute(request.getSession().getId()+SmsSendUtil.pictureCodeToRegister,sessionPictureCode);
+            request.getSession().setAttribute(request.getSession().getId()+_Mobile,mobile);
         }
         return list;
     }
@@ -547,6 +564,7 @@ public class YunUserService {
         g.dispose();// 类似于流中的close()带动flush()---把数据刷到img对象当中
         ImageIO.write(img, "JPG", response.getOutputStream());
         request.getSession().setAttribute(request.getSession().getId()+SmsSendUtil.pictureCode,pictureCode.toString());
+        request.getSession().setAttribute(request.getSession().getId()+SmsSendUtil.pictureCodeToRegister,pictureCode.toString());
         return Response.status(Response.Status.OK).entity(response.getOutputStream()).header("Content-disposition","attachment;filename="+"图形码")
                 .header("Cache-Control","no-cache").build();
     }
@@ -575,4 +593,40 @@ public class YunUserService {
         return list;
     }
 
+    /**
+     * 更新用户
+     * @param yunUsers
+     * @return
+     */
+    @POST
+    @Transactional
+    @Path("audit-user")
+    public Response auditYunUser(YunUsers yunUsers) throws Exception {
+        String id = yunUsers.getId();
+        if(id==null||"".equals(id)){
+            System.out.println(id);
+            throw new Exception("获取不到原信息的ID");
+        }
+        YunUsers dbUsers = userFacade.get(YunUsers.class,id);
+        String loginFlags = dbUsers.getLoginFlags();
+        dbUsers.setLoginFlags(yunUsers.getLoginFlags());
+        dbUsers.setRolename(yunUsers.getRolename());
+        YunUsers users = userFacade.merge(dbUsers);
+        if(!users.getLoginFlags().equals(loginFlags) && "R".equals(users.getLoginFlags())){//表示审核通过
+            String mailInfo = "您好:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;您的账号"+yunUsers.getUserName()+"已通过审核，您可以进行登录了，登录连接<a href=\"http://nrdrs.org\">http://nrdrs.org</a>";
+            mailSendFacade.sendMail("用户审核",users.getEmail(),mailInfo);
+            mailSendFacade.sendMessageToUser(yunUsers.getId(),"用户审核",mailInfo);
+        }
+        String hql = "delete from RoleVsUser as r where r.userId='"+yunUsers.getId()+"'" ;
+        userFacade.excHql(hql);
+        String roleHql = " from RoleDict where code = '"+yunUsers.getRolename()+"'";
+        List<RoleDict> roleDicts = userFacade.createQuery(RoleDict.class,roleHql,new ArrayList<Object>()).getResultList();
+        for(RoleDict roleDict:roleDicts){
+            RoleVsUser roleVsUser = new RoleVsUser();
+            roleVsUser.setUserId(yunUsers.getId());
+            roleVsUser.setRoleId(roleDict.getId());
+            userFacade.merge(roleVsUser);
+        }
+        return Response.status(Response.Status.OK).entity(users).build();
+    }
 }

@@ -754,13 +754,54 @@ public class BaseFacade {
             return hqlCount;
         }
         String hqlUpper = hql.toUpperCase();
-        int fromIndex = hqlUpper.indexOf("FROM");
+        //int fromIndex = hqlUpper.indexOf("FROM");
+        int fromIndex = getFromIndex(hqlUpper);
         if(hqlUpper.contains("DISTINCT")){
             int disIndex = hqlUpper.indexOf("DISTINCT");
             hqlCount = "SELECT COUNT("+hql.substring(disIndex,fromIndex)+") "+hql.substring(fromIndex);
         }else{
             hqlCount = "SELECT COUNT(*) "+hql.substring(fromIndex);
         }
+        String orderHql = hqlCount.toUpperCase();
+        if(orderHql.contains("ORDER") && orderHql.contains("BY")){
+            int orderIndex = orderHql.indexOf("ORDER");
+            if(orderIndex != -1){
+                hqlCount = hqlCount.substring(0,orderIndex);
+            }
+        }
+        if(orderHql.contains("GROUP") && orderHql.contains("BY")){
+            int groupIndex = orderHql.indexOf("GROUP");
+            int orderIndex = orderHql.indexOf("ORDER");
+            if(groupIndex!=-1){
+                String distinctFile ="";
+                if(orderIndex!=-1){
+                    distinctFile = hqlCount.substring(groupIndex+5,orderIndex);
+                }else{
+                    distinctFile = hqlCount.substring(groupIndex+5);
+                }
+                distinctFile = distinctFile.replace("BY","");
+                distinctFile = distinctFile.replace("by","");
+                distinctFile = distinctFile.replace(" ","");
+                hqlCount = hqlCount.substring(0,groupIndex);
+                hqlCount = hqlCount.replace("SELECT COUNT(*)","SELECT COUNT(DISTINCT "+distinctFile+")");
+            }
+        }
         return hqlCount;
+    }
+
+    public static int getFromIndex(String hql){
+        String finalString = getFinalString(hql);
+        return finalString.lastIndexOf("FROM");
+    }
+    public static String getFinalString(String hql){
+        int lastLeftBracket = hql.lastIndexOf("(");
+        int lastRightBracket = hql.lastIndexOf(")");
+        int fromIndex = hql.lastIndexOf("FROM");
+        if(fromIndex>lastLeftBracket && fromIndex<lastRightBracket ){//说明是子查询
+            hql = hql.substring(0,lastLeftBracket);
+            return getFinalString(hql);
+        }else{
+            return hql;
+        }
     }
 }

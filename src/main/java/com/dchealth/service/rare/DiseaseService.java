@@ -143,6 +143,8 @@ public class DiseaseService {
                 hql += " and exists(select 1 from yun_user_disease_manager ym where ym.dcode = yf.diagnosis_code and ym.user_id in ("+userIds+"))";
             }
         }
+        //排除表单录入者和超级管理员 设计上不太合理感觉
+        hql += " and yp.doctor_id not in (select id from yun_users where rolename in ('FORM_USER','ADMINISTRATOR') and id<>'"+doctorId+"')";
         hql +=" group by yf.diagnosis_code";
         List list = baseFacade.createNativeQuery(hql).getResultList();
         if(list!=null && !list.isEmpty()){
@@ -172,6 +174,8 @@ public class DiseaseService {
                 hql += " and exists(select 1 from yun_user_disease_manager ym where ym.dcode = f.dcode and ym.user_id in ("+inSql+"))";
             }
         }
+        //排除表单录入者和超级管理员 设计上不太合理感觉
+        hql += " and p.doctor_id not in (select id from yun_users where rolename in ('FORM_USER','ADMINISTRATOR') and id<>'"+doctorId+"')";
         hql +=" GROUP BY f.dcode";
         List list = baseFacade.createNativeQuery(hql).getResultList();
         if(list!=null && !list.isEmpty()){

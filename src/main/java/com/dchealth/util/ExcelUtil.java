@@ -3,14 +3,16 @@ package com.dchealth.util;
 import com.dchealth.VO.ExcelCell;
 import com.dchealth.VO.ExcelRow;
 import org.apache.poi.hssf.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.xssf.usermodel.*;
 import sun.applet.Main;
 
-import java.io.File;
-import java.io.FileInputStream;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -272,5 +274,139 @@ public class ExcelUtil {
     }
     public static void setNf(DecimalFormat nf) {
         ExcelUtil.nf = nf;
+    }
+
+    /**
+     * 生成excel文件 并返回文件路径信息
+     * @param headMap
+     * @param list
+     * @param httpServletRequest
+     * @param <T>
+     * @return
+     * @throws Exception
+     */
+    public static <T> String  produceExcel(Map headMap,List<T> list,HttpServletRequest httpServletRequest){
+        String tempFilePath = SmsSendUtil.getStringByKey("tempFilePath");
+        String path = httpServletRequest.getServletContext().getRealPath("/");
+        String downFilePath = path+File.separator+"upload";
+        tempFilePath = tempFilePath==null?downFilePath:tempFilePath;
+        String randomfm = UUID.randomUUID().toString();
+        String filePath = tempFilePath + File.separator  + randomfm + ".xlsx";
+        if(list==null && list.isEmpty()){
+            return filePath;
+        }
+        File folder = new File(tempFilePath);
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
+        XSSFWorkbook wb = new XSSFWorkbook();
+        XSSFSheet sheet = wb.createSheet();
+        sheet.setDefaultRowHeight((short) 600);
+        sheet.autoSizeColumn(1, true);
+        try {
+            int p=0;
+            XSSFRow row =  sheet.createRow(p);//第一行为表头
+            XSSFCellStyle style = createHSSFCellStyle(wb);
+            for(T t:list){
+                XSSFRow row2 = sheet.createRow(p+1);
+                int colIndex = 0;
+                int colValueIndex = 0;
+                Field[] fileds = t.getClass().getDeclaredFields();
+                for(Field field:fileds){
+                    field.setAccessible(true);
+                    if(headMap.containsKey(field.getName())){
+                        Method m = t.getClass().getMethod("get" + toUpperFristChar(field.getName()));
+                        Object value = m.invoke(t);
+                        if(p==0){
+                            XSSFCell noCell = row.createCell(colIndex++);
+                            noCell.setCellValue(headMap.get(field.getName())+"");
+                            noCell.setCellStyle(style);
+                        }
+                        XSSFCell cell2 = row2.createCell(colValueIndex++);
+                        if("long".equals(field.getType().toString())){
+                            Long ctLong = Long.valueOf(value+"");
+                            cell2.setCellValue(ctLong);
+                        }else if("class java.lang.String".equals(field.getType().toString())){
+                            cell2.setCellValue((String)value);
+                        }else{
+                            cell2.setCellValue(value+"");
+                        }
+                        cell2.setCellStyle(style);
+                    }
+                }
+                p++;
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        FileOutputStream out = null;
+        try {
+            File file = new File(filePath);
+            out  =  new FileOutputStream(file);
+            wb.write(out);
+            out.close();
+        } catch (IOException e) {
+            throw new RuntimeException("文件写入异常！" + e.getMessage());
+        } finally {
+            out = null;
+        }
+        return filePath;
+    }
+
+    /**
+     * 下载生成的excel病历信息
+     * @param path
+     * @param response
+     * @param fileName
+     */
+    public static void download(String path, HttpServletResponse response, String fileName) {
+        try {
+            // path是指欲下载的文件的路径。
+            File file = new File(path);
+            // 取得文件名。
+            String filename = file.getName();
+            // 以流的形式下载文件。
+            InputStream fis = new BufferedInputStream(new FileInputStream(path));
+            byte[] buffer = new byte[fis.available()];
+            fis.read(buffer);
+            fis.close();
+            // 清空response
+            response.reset();
+            // 设置response的Header
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8");
+            response.setHeader("Content-Disposition", "attachment;filename="+ new String(fileName.getBytes(), "iso-8859-1"));
+            response.setContentLength(buffer.length);
+            OutputStream toClient = new BufferedOutputStream(
+                    response.getOutputStream());
+            response.setContentType("application/vnd.ms-excel;charset=gb2312");
+            toClient.write(buffer);
+            toClient.flush();
+            toClient.close();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static XSSFCellStyle createHSSFCellStyle(XSSFWorkbook wb) {
+        XSSFCellStyle style = wb.createCellStyle(); // 单元格格式
+        style.setWrapText(true); // 设置自动换行
+        style.setFillPattern(CellStyle.SOLID_FOREGROUND);
+        style.setFillForegroundColor(IndexedColors.WHITE.getIndex());
+        style.setBorderBottom((short) 3);
+        style.setBorderLeft((short) 3);
+        style.setBorderRight((short) 3);
+        style.setBorderTop((short) 3);
+        return style;
+    }
+
+    /**
+     * 首字母大写
+     * @param string
+     * @return
+     */
+    public static String toUpperFristChar(String string) {
+        char[] charArray = string.toCharArray();
+        charArray[0] -= 32;
+        return String.valueOf(charArray);
     }
 }

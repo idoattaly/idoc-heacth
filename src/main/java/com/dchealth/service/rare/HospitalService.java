@@ -2,6 +2,7 @@ package com.dchealth.service.rare;
 
 import com.dchealth.VO.Page;
 import com.dchealth.entity.common.HospitalDict;
+import com.dchealth.entity.common.YunUsers;
 import com.dchealth.facade.common.BaseFacade;
 import com.dchealth.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,9 +83,19 @@ public class HospitalService {
             }
         }
         HospitalDict mergeHospitalDict = baseFacade.merge(hospitalDict);
+        List<YunUsers> yunUsersList = getYunUsersByHospitalCode(hospitalDict.getHospitalCode());
+        for(YunUsers yunUsers:yunUsersList){
+            yunUsers.setHospitalName(mergeHospitalDict.getHospitalName());
+            baseFacade.merge(yunUsers);
+        }
         return Response.status(Response.Status.OK).entity(mergeHospitalDict).build();
     }
 
+    public List<YunUsers> getYunUsersByHospitalCode(String code){
+        String hql = "from YunUsers where status<>'-1' and hospitalCode = '"+code+"'";
+        List<YunUsers> yunUsers = baseFacade.createQuery(YunUsers.class,hql,new ArrayList<Object>()).getResultList();
+        return yunUsers;
+    }
     /**
      * 判断是否有重复医院
      * @param hospitalDict
