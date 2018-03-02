@@ -9,8 +9,18 @@ public class DiseaseMonthCount {
     private long totalCount;
     private long nowMonthCount;
     private long lastMonthCount;
+    private long sumTotalCount;
 
     public DiseaseMonthCount() {
+    }
+
+    public DiseaseMonthCount(String name, String dcode, Long totalCount, Long nowMonthCount, Long lastMonthCount, Long sumTotalCount) {
+        this.name = name;
+        this.dcode = dcode;
+        this.totalCount = (totalCount==null?0:totalCount);
+        this.nowMonthCount = (nowMonthCount==null?0:nowMonthCount);
+        this.lastMonthCount = (lastMonthCount==null?0:lastMonthCount);
+        this.sumTotalCount = (sumTotalCount==null?0:sumTotalCount);
     }
 
     public DiseaseMonthCount(String name, String dcode, Long totalCount, Long nowMonthCount, Long lastMonthCount) {
@@ -59,5 +69,13 @@ public class DiseaseMonthCount {
 
     public void setLastMonthCount(long lastMonthCount) {
         this.lastMonthCount = lastMonthCount;
+    }
+
+    public long getSumTotalCount() {
+        return sumTotalCount;
+    }
+
+    public void setSumTotalCount(long sumTotalCount) {
+        this.sumTotalCount = sumTotalCount;
     }
 }

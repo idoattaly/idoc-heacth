@@ -36,6 +36,8 @@
                 /login.html=anon
                 /api/hospital=anon
                 /api/file/upload=anon
+                /api/briefing/list-briefing-data = anon
+                /api/briefing/get-briefing-page = anon
                 /api/hospital/get-hospital-dicts = anon
                 /api/yun-user/get-picture-code = anon
                 /api/statistics/get-disease-share-count = anon

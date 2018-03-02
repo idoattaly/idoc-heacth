@@ -187,17 +187,21 @@ public class TemplateService {
             Map<String,RowObject> rowObjectMap = new HashMap<String,RowObject>();
             for (Row row:rows){
                 RowObject rowObject = new RowObject();
-                setRowObject(row,rowObject);//赋值
-                rowssubjects.add(rowObject);
+                //setRowObject(row,rowObject);//赋值
+                //rowssubjects.add(rowObject);
                 rowObjectMap.put(JSONUtil.objectToJsonString(row),rowObject);
             }
             System.out.println(rowObjectMap.size()+"条");
             long stime = System.currentTimeMillis();
-//            rowObjectMap = getRowObjectMapValue(rowObjectMap);
-//            for (Row row:rows){
-//                String key = JSONUtil.objectToJsonString(row);
-//                rowssubjects.add(rowObjectMap.get(key));
-//            }
+            try{
+                rowObjectMap = getRowObjectMapValue(rowObjectMap);
+                for (Row row:rows){
+                    String key = JSONUtil.objectToJsonString(row);
+                    rowssubjects.add(rowObjectMap.get(key));
+                }
+            }catch (Exception e){
+                e.printStackTrace();
+            }
             long etime = System.currentTimeMillis();
             System.out.println("花费时间"+(etime-stime)+"毫秒");
             formPage.getPages().add(modelPage);
@@ -210,7 +214,6 @@ public class TemplateService {
         YunUsers yunUsers = UserUtils.getYunUsers();
         String deptId = yunUsers.getDeptId();
         String id = yunUsers.getId();
-
         Map<String,ElementRow> colElementRowMap = new HashMap<>();
         StringBuffer colValuesBuf = new StringBuffer("");
         if(rowObjectMap!=null && !rowObjectMap.isEmpty()){
@@ -262,7 +265,8 @@ public class TemplateService {
                             String doctorId = (params[2]==null?"":params[2].toString());
                             String dict = (params[3]==null?"":params[3].toString());
                             String relyon = (params[4]==null?"":params[4].toString());
-                            colFmtMap.put(name,params[1]+"@"+doctorId+"@"+dict+"@"+relyon);
+                            //colFmtMap.put(name,params[1]+"@"+doctorId+"@"+dict+"@"+relyon);
+                            colFmtMap.put(key,params[1]+"@"+doctorId+"@"+dict+"@"+relyon);
                         }
                     }else{
                         throw new Exception("获取名称为【"+key+"】的元数据格式失败！");
@@ -275,6 +279,9 @@ public class TemplateService {
             for(String key:colElementRowMap.keySet()){
                 ElementRow elementRow = colElementRowMap.get(key);
                 String params = colFmtMap.get(key);
+                if(StringUtils.isEmpty(params)){
+                    continue;
+                }
                 String[] paramArray = params.split("@");
                 String format = paramArray[0];
                 String doctorId = paramArray.length>1?paramArray[1]:"";
@@ -381,14 +388,14 @@ public class TemplateService {
                         }
                     }
                 }
-                for(String key:rowObjectMap.keySet()){
-                    Row row = (Row)JSONUtil.JSONToObj(key, Row.class);
-                    RowObject rowObject = rowObjectMap.get(key);
-                    if(row.getCols()!=null && !row.getCols().isEmpty()){
-                        for(Col col:row.getCols()){
-                            String colValue = StringUtils.replaceBank(col.getValue());
-                            rowObject.getRows().add(colElementRowMap.get(colValue));
-                        }
+            }
+            for(String key:rowObjectMap.keySet()){
+                Row row = (Row)JSONUtil.JSONToObj(key, Row.class);
+                RowObject rowObject = rowObjectMap.get(key);
+                if(row.getCols()!=null && !row.getCols().isEmpty()){
+                    for(Col col:row.getCols()){
+                        String colValue = StringUtils.replaceBank(col.getValue());
+                        rowObject.getRows().add(colElementRowMap.get(colValue));
                     }
                 }
             }
