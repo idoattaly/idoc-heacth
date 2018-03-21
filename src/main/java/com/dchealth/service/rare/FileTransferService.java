@@ -31,6 +31,7 @@ import javax.ws.rs.core.Response;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * Created by Administrator on 2017/7/27.
@@ -116,13 +117,13 @@ public class FileTransferService {
     @GET
     @Path("patient-info-check-out")
     public List<String> checkOutPatientInfo(@QueryParam("patientId")String patientId,@QueryParam("doctorId")String doctorId,@QueryParam("dcode")String dcode,
-                                            @QueryParam("mode")String mode,@Context HttpServletResponse httpServletResponse,
+                                            @QueryParam("mode")String mode,@QueryParam("type")String type,@Context HttpServletResponse httpServletResponse,
                                             @Context HttpServletRequest httpServletRequest) throws Exception{
         List<YunRecordDocment> yunRecordDocments = null;
         List<String> list = new ArrayList<>();
         boolean isMany = false;
         if(StringUtils.isEmpty(mode)||"0".equals(mode)){//默认为医生下所有病人病历信息导出
-            yunRecordDocments = getyunRecordDocmentsByDoctorId(doctorId,dcode);
+            yunRecordDocments = getyunRecordDocmentsByDoctorId(doctorId,dcode,type);
             isMany = true;
             list.add(doctorId);
         }else if("1".equals(mode)){//单个病人病历信息导出
@@ -131,8 +132,8 @@ public class FileTransferService {
             yunRecordDocments.add(yunRecordDocment);
             list.add(patientId);
         }
-        String filePath =produceExcel(yunRecordDocments,isMany,httpServletRequest);
-        String diseaseName = yunRecordDocments==null?"病历信息":yunRecordDocments.get(0).getTypecode2();
+        String filePath =produceExcel(yunRecordDocments,isMany,type,httpServletRequest);
+        String diseaseName = (yunRecordDocments==null||yunRecordDocments.isEmpty())?"病历信息":yunRecordDocments.get(0).getTypecode2();
         String fileName = diseaseName+DateUtils.getFormatDate(new Date(),DateUtils.DATE_FORMAT)+(isMany?".xlsx":".xls");
         download(filePath,httpServletResponse,fileName);
         return list;
@@ -160,9 +161,14 @@ public class FileTransferService {
      * @param dcode
      * @return
      */
-    public List<YunRecordDocment> getyunRecordDocmentsByDoctorId(String doctorId,String dcode){
+    public List<YunRecordDocment> getyunRecordDocmentsByDoctorId(String doctorId,String dcode,String type){
         String hql = "select r from YunRecordDocment as r,YunFolder as f,YunPatient as p where f.id = r.folderId and f.patientId = p.id and r.category<>'S'" +
-                     " and f.diagnosisCode = '"+dcode+"' and p.doctorId = '"+doctorId+"'";
+                     " and f.diagnosisCode = '"+dcode+"' and p.doctorId = '"+doctorId+"'  ";
+        if("1".equals(type)){
+            hql += " and r.templetname like '%随访记录%'";
+        }else{
+            hql += " and r.templetname='基线信息'";
+        }
         return baseFacade.createQuery(YunRecordDocment.class,hql,new ArrayList<Object>()).getResultList();
     }
     public List<Map> getModelTemplateVoList(String dcode,String title) throws Exception{
@@ -253,7 +259,7 @@ public class FileTransferService {
      * @return
      * @throws Exception
      */
-    public String produceExcel(List<YunRecordDocment> yunRecordDocments,boolean isMany,HttpServletRequest httpServletRequest) throws Exception{
+    public String produceExcel(List<YunRecordDocment> yunRecordDocments,boolean isMany,String type,HttpServletRequest httpServletRequest) throws Exception{
         String tempFilePath = SmsSendUtil.getStringByKey("tempFilePath");
         String path = httpServletRequest.getServletContext().getRealPath("/");
         String downFilePath = path+File.separator+"upload";
@@ -287,28 +293,47 @@ public class FileTransferService {
                     map.put(documentDataElement.getName(),documentDataElement.getData());
                 }
                 List<Map> modelTemplateVoList = getModelTemplateVoList(yunRecordDocment.getTypecode1(),yunRecordDocment.getTitle());
+                String title = documentData.getName();
+                if("1".equals(type)){//随访记录有多条添加记录信息 比如随访记录1 随访记录2 随访记录3等
+                    XSSFCellStyle style = createHSSFCellStyle(wb);
+                    XSSFCellStyle styleBolder = createBolderXSSFCellStyle(wb);
+                    XSSFCell noCell = row.createCell(colIndex++);
+                    noCell.setCellValue("随访信息");
+                    noCell.setCellStyle(styleBolder);
 
+                    XSSFCell cell2 = row2.createCell(colValueIndex++);
+                    cell2.setCellStyle(style);
+                    cell2.setCellValue(title);
+                }
                 for(int i=0;i<modelTemplateVoList.size();i++){
                     Map modelTemplateVo = modelTemplateVoList.get(i);
                     String key = modelTemplateVo.get("value")+"@"+modelTemplateVo.get("name");
                     if(formMap.get(key)==null){
                         fillTemplateMbsjMap(modelTemplateVoList);
                     }
-                    Form form = formMap.get(key)==null?null:getFormData(formMap.get(key)+"");
+                    String mbsj = formMap.get(key)==null?null:(formMap.get(key)+"");
+                    if(!StringUtils.isEmpty(mbsj)){
+                        mbsj = mbsj.replace("inputcode","inputCode");
+                    }
+                    Form form = mbsj==null?null:getFormData(mbsj);
 //                    Form form = getPubTemplateForm(modelTemplateVo.get("value")+"",modelTemplateVo.get("name")+"");
 //                    if(form==null){
 //                        form = getPrivateTemplateForm(modelTemplateVo.get("value")+"",modelTemplateVo.get("name")+"");
 //                    }
                     Object data = map.get(modelTemplateVo.get("name"));
                     Map valueMap = (Map)JSONUtil.JSONToObj(JSONUtil.objectToJsonString(data),Map.class);
-                    if(form!=null && !form.getForm_template().getPages().isEmpty()){
-                        List<ModelPage> pages = form.getForm_template().getPages();
-                        for(ModelPage modelPage:pages){
-                            String modelTitle = modelPage.getTitle();//excel头部--基本情况
-                            List<RowObject> rowObjects = modelPage.getRowssubjects();
-                            colIndex = writeToFileByType(wb,row,row2,colIndex,colValueIndex,rowObjects,sheet,p,valueMap,isMany);
-                            colValueIndex = colIndex;
+                    try {
+                        if(form!=null && !form.getForm_template().getPages().isEmpty()){
+                            List<ModelPage> pages = form.getForm_template().getPages();
+                            for(ModelPage modelPage:pages){
+                                String modelTitle = modelPage.getTitle();//excel头部--基本情况
+                                List<RowObject> rowObjects = modelPage.getRowssubjects();
+                                colIndex = writeToFileByType(wb,row,row2,colIndex,colValueIndex,rowObjects,sheet,p,valueMap,isMany,title,type);
+                                colValueIndex = colIndex;
+                            }
                         }
+                    }catch (Exception e){
+                        e.printStackTrace();
                     }
                 }
                 p++;
@@ -360,23 +385,24 @@ public class FileTransferService {
         }
         return filePath;
     }
-    private int writeToFileByType(XSSFWorkbook wb,XSSFRow row,XSSFRow row2,int colIndex,int colValueIndex,List<RowObject> rowObjects,XSSFSheet sheet,int p,Map valueMap,boolean isMany) throws Exception{
+    private int writeToFileByType(XSSFWorkbook wb,XSSFRow row,XSSFRow row2,int colIndex,int colValueIndex,List<RowObject> rowObjects,XSSFSheet sheet,int p,Map valueMap,boolean isMany,String title,String etype) throws Exception{
         XSSFCellStyle style = createHSSFCellStyle(wb);
         XSSFCellStyle styleBolder = createBolderXSSFCellStyle(wb);
         for(RowObject rowObject:rowObjects){
-            ElementRow elementRow = rowObject.getRows().get(0);
-            String rowName = elementRow.getName();//EMAIL 此为key 通过key获取邮箱对应的值
-            String type = elementRow.getType();//text
-            String head = elementRow.getExtend().getHead();//邮箱
-            String relyon = elementRow.getExtend().getRelyon();//数据依赖
-            if(p==0 && elementRow.getItems().isEmpty()){
-                XSSFCell noCell = row.createCell(colIndex++);
-                noCell.setCellValue(removeHtmlToken(head));
-                noCell.setCellStyle(styleBolder);
-            }
-            if(elementRow.getItems().isEmpty()){
-                XSSFCell cell2 = row2.createCell(colValueIndex++);
-                cell2.setCellStyle(style);
+            for(ElementRow elementRow:rowObject.getRows()){
+                String rowName = elementRow.getName();//EMAIL 此为key 通过key获取邮箱对应的值
+                String type = elementRow.getType();//text
+                String head = elementRow.getExtend().getHead();//邮箱
+                String relyon = elementRow.getExtend().getRelyon();//数据依赖
+               // boolean isSame = judgeIsSame(elementRow,valueMap);
+                if(p==0 && elementRow.getItems().isEmpty()){
+                    XSSFCell noCell = row.createCell(colIndex++);
+                    noCell.setCellValue(removeHtmlToken(head));
+                    noCell.setCellStyle(styleBolder);
+                }
+                if(elementRow.getItems().isEmpty()){
+                    XSSFCell cell2 = row2.createCell(colValueIndex++);
+                    cell2.setCellStyle(style);
                     if("text".equals(type)){
                         if(valueMap!=null && valueMap.get(rowName)!=null){
                             cell2.setCellValue(removeHtmlToken(valueMap.get(rowName)+""));
@@ -389,54 +415,132 @@ public class FileTransferService {
                     }else{
                         if(valueMap!=null && valueMap.get(rowName)!=null){
                             cell2.setCellValue(removeHtmlToken(valueMap.get(rowName)+""));
+                        }else{
+                            cell2.setCellValue("");
                         }
                     }
                 }else{
-                    int indexItem = 0;
-                    if(type.contains("select")){//select_radio,select_block,select
-                        if(p==0){
-                            XSSFCell noCell = row.createCell(colIndex++);
-                            noCell.setCellValue(removeHtmlToken(head));
-                            noCell.setCellStyle(styleBolder);
-                        }
-                        if(valueMap!=null && !StringUtils.isEmpty(valueMap.get(rowName)+"")){
-                            String valueit = valueMap.get(rowName)+"";
-                            XSSFCell cellItem = row2.createCell(colValueIndex++);
-                            cellItem.setCellStyle(style);
-                            StringBuffer cellValue=new StringBuffer("");
-                            for(RowItem rowItem:elementRow.getItems()){
-                                if(rowItem.getName().equals(rowName) && ifContainsValue(valueit,rowItem.getValue())){
-                                    cellValue.append(",").append(removeHtmlToken(rowItem.getText()));
+                    //boolean isSame = judgeIsSame(elementRow,valueMap);
+                        int indexItem = 0;
+                        if(type.contains("select")){//select_radio,select_block,select
+                            if(p==0){
+                                XSSFCell noCell = row.createCell(colIndex++);
+                                noCell.setCellValue(removeHtmlToken(head));
+                                noCell.setCellStyle(styleBolder);
+                            }
+                            if(valueMap!=null && !StringUtils.isEmpty(valueMap.get(rowName)+"")){
+                                String valueit = valueMap.get(rowName)+"";
+                                String appendName = "";
+                                if(valueit.contains(":")){
+                                    int indexMh = valueit.indexOf(":");
+                                    appendName = valueit.substring(indexMh);
+                                    valueit = valueit.substring(0,indexMh);
+                                }
+                                XSSFCell cellItem = row2.createCell(colValueIndex++);
+                                cellItem.setCellStyle(style);
+                                StringBuffer cellValue=new StringBuffer("");
+                                for(RowItem rowItem:elementRow.getItems()){
+                                    if(rowItem.getName().equals(rowName) && ifContainsValue(valueit,rowItem.getValue())){
+                                        cellValue.append(",").append(removeHtmlToken(rowItem.getText())).append(appendName);
+                                    }
+                                }
+                                cellItem.setCellValue(cellValue.toString().length()>0?cellValue.toString().substring(1):"");
+                            }else{
+                                XSSFCell cellItem = row2.createCell(colValueIndex++);
+                                cellItem.setCellStyle(style);
+                                cellItem.setCellValue("");
+                            }
+                        } else {
+                            if("text_xs".equals(type)||"division-text-2-xs".equals(type)||("text".equals(type))){//说明是文本
+                                System.out.println("===="+elementRow.getName()+""+elementRow.getItems().get(0).getText());
+                                if(p==0){
+                                    XSSFCell cellItem = row.createCell(colIndex++);
+                                    cellItem.setCellValue(head);
+                                    cellItem.setCellStyle(style);
+                                }
+                                XSSFCell cellItem1 = row2.createCell(colValueIndex++);
+                                if(valueMap!=null && !StringUtils.isEmpty(valueMap.get(elementRow.getName())+"")){
+                                    cellItem1.setCellValue(valueMap.get(elementRow.getName())+"");
+                                }else if(valueMap!=null){
+                                    String apvalue = "";
+                                    for(int i=1;i<=elementRow.getItems().size();i++){
+                                        String key = elementRow.getName()+"_"+i;
+                                        if(i!=1){
+                                            apvalue += "-"+valueMap.get(key);
+                                        }else {
+                                            apvalue += valueMap.get(key);
+                                        }
+                                    }
+                                    cellItem1.setCellValue(apvalue);
+                                }
+                                cellItem1.setCellStyle(style);
+
+                            }else{
+                                for(RowItem rowItem:elementRow.getItems()){//完成多条是否选择显示
+                                    if(p==0){
+                                        XSSFCell cellItem = row.createCell(colIndex++);
+                                        cellItem.setCellValue(head+"-"+removeHtmlToken(rowItem.getText()));
+                                        cellItem.setCellStyle(style);
+                                    }
+                                    XSSFCell cellItem1 = row2.createCell(colValueIndex++);
+                                    String key = rowItem.getName()+"_"+rowItem.getValue()+"_"+(indexItem++);
+                                    if(valueMap!=null && "1".equals(valueMap.get(key))){
+                                        cellItem1.setCellValue("是");
+                                        cellItem1.setCellStyle(style);
+                                    }else if(valueMap!=null && "0".equals(valueMap.get(key))){
+                                        cellItem1.setCellValue("否");
+                                        cellItem1.setCellStyle(style);
+                                    }else{
+                                        String keyOther = rowItem.getName()+"_"+getReduceValue(rowItem.getValue())+"_1";
+                                        if(valueMap!=null && valueMap.get(keyOther)!=null){
+                                            cellItem1.setCellValue(valueMap.get(keyOther)+"");
+                                        }else{
+                                            cellItem1.setCellValue("");
+                                        }
+                                        cellItem1.setCellStyle(style);
+                                    }
                                 }
                             }
-                            cellItem.setCellValue(cellValue.toString().length()>0?cellValue.toString().substring(1):"");
                         }
-                    } else {
-                        for(RowItem rowItem:elementRow.getItems()){//完成多条是否选择显示
-                            if(p==0){
-                                XSSFCell cellItem = row.createCell(colIndex++);
-                                cellItem.setCellValue(head+"-"+removeHtmlToken(rowItem.getText()));
-                                cellItem.setCellStyle(style);
-                            }
-                            XSSFCell cellItem1 = row2.createCell(colValueIndex++);
-                            String key = rowItem.getName()+"_"+rowItem.getValue()+"_"+(indexItem++);
-                            if(valueMap!=null && "1".equals(valueMap.get(key))){
-                                cellItem1.setCellValue("是");
-                                cellItem1.setCellStyle(style);
-                            }else if(valueMap!=null && "0".equals(valueMap.get(key))){
-                                cellItem1.setCellValue("否");
-                                cellItem1.setCellStyle(style);
-                            }else{
-                                cellItem1.setCellValue("");
-                                cellItem1.setCellStyle(style);
-                            }
-                        }
-                    }
+                    //}
                 }
+            }
+        }
+        if(p>0){
+            colIndex = colValueIndex;
         }
         return colIndex;
     }
 
+    public static Object getReduceValue(String str){
+        Pattern pattern = Pattern.compile("^[-\\+]?[\\d]*$");
+        boolean isNumber = pattern.matcher(str).matches();
+        if(isNumber){
+            Integer value = Integer.valueOf(str)-1;
+            return value;
+        }else{
+            return str;
+        }
+    }
+    public boolean judgeIsSame(ElementRow elementRow,Map valueMap){
+        if(valueMap==null || valueMap.isEmpty()){
+            return false;
+        }
+        boolean isSame = true;
+        if(!"text_xs".equals(elementRow.getType())||"division-text-2-xs".equals(elementRow.getType())){
+            return false;
+        }
+        if(elementRow.getItems()!=null && !elementRow.getItems().isEmpty()){
+            for(RowItem rowItem:elementRow.getItems()){
+                if(rowItem.getText()!=null  && !rowItem.getText().contains("测试")){
+                    isSame = false;
+                }
+            }
+        }else{
+            isSame = false;
+        }
+        return isSame;
+    }
     private void writeToFile(HSSFWorkbook wb,FileOutputStream out,List<RowObject> rowObjects,String sheetName,int i,Map valueMap) throws Exception{
         HSSFCellStyle style = createHSSFCellStyle(wb);
         HSSFCellStyle styleBolder = createBolderHSSFCellStyle(wb);

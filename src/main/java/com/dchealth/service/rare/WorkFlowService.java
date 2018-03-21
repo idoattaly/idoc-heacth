@@ -1,6 +1,7 @@
 package com.dchealth.service.rare;
 
 import com.dchealth.VO.*;
+import com.dchealth.entity.common.YunDictitem;
 import com.dchealth.entity.common.YunUsers;
 import com.dchealth.entity.rare.*;
 import com.dchealth.facade.common.BaseFacade;
@@ -417,7 +418,7 @@ public class WorkFlowService {
         patient.setPid(postPara.getpId());
         patient.setTel1(postPara.getTel1());
         patient.setTel2(postPara.getTel2());
-        patient.setSx(postPara.getSx());
+        patient.setSx(getSexNameByDoctorId(yunUsers.getId(),postPara.getSx()));//postPara.getSx()
         return patient = baseFacade.merge(patient);
     }
 
@@ -494,5 +495,33 @@ public class WorkFlowService {
             }
         }
         return infoLists;
+    }
+
+    /**
+     * 根据传入的性别code查询其对应的名称
+     * @param userId
+     * @param value
+     * @return
+     */
+    public String getSexNameByDoctorId(String userId,String value){
+        String sexName = "";
+        String hql = "select d from YunDicttype as t,YunDictitem as d where t.id = d.typeIdDm and t.typeName='性别' and t.userId = '"+userId+"'";
+        List<YunDictitem> yunDictitems = baseFacade.createQuery(YunDictitem.class,hql,new ArrayList<Object>()).getResultList();
+        if(yunDictitems==null || yunDictitems.isEmpty()){//先查私有字典，如果私有字典未查到则查询公共字典
+            hql = "select d from YunDicttype t,YunDictitem as d where t.id = d.typeIdDm and t.typeName='性别' and t.userId = '0'";
+            yunDictitems = baseFacade.createQuery(YunDictitem.class,hql,new ArrayList<Object>()).getResultList();
+        }
+        if(yunDictitems!=null && !yunDictitems.isEmpty()){
+            for(YunDictitem yunDictitem:yunDictitems){
+                if(yunDictitem.getItemCode().equals(value)){
+                    sexName = yunDictitem.getItemName();
+                    break;
+                }
+            }
+        }
+        if(StringUtils.isEmpty(sexName)){
+            sexName = value;
+        }
+        return sexName;
     }
 }

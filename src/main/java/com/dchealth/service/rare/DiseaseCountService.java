@@ -255,8 +255,9 @@ public class DiseaseCountService {
                     "group by yf.diagnosisCode) as lastMonthCount,(select count(yf.id) from YunFolder as yf,YunPatient as yp,YunUsers as u,YunDiseaseList as yd where yf.diagnosisCode = yd.dcode and " +
                     "yf.patientId = yp.id and yp.doctorId = u.id and u.rolename!='FORM_USER') as sumTotalCount) from YunDiseaseList as d,YunFolder as f,YunPatient as p" +
                     " where d.dcode = f.diagnosisCode and f.patientId = p.id  and  exists(select 1 from YunUsers where id = p.doctorId and rolename!='FORM_USER')";
-            hqlCount = "select count(f.id) from YunDiseaseList as d,YunFolder as f,YunPatient as p " +
-                    " where d.dcode = f.diagnosisCode and f.patientId = p.id  and  exists(select 1 from YunUsers where id = p.doctorId and rolename!='FORM_USER')";
+            hqlCount = "select count(*) from YunDiseaseList as d " +
+                    " where exists(select 1 from YunFolder as f,YunPatient as p,YunUsers as u where f.diagnosisCode = d.dcode and " +
+                    " f.patientId = p.id and u.id = p.doctorId and rolename!='FORM_USER')";
             if(!StringUtils.isEmpty(name)){
                 hql += " and d.name like '%"+name+"%'";
                 hqlCount += " and d.name like '%"+name+"%'";
