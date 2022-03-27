@@ -50,6 +50,12 @@ public class TimeService {
         return baseFacade.get(YunUsers.class,id);
     }
 
+    @GET
+    @Path("get-by-id2")
+    public YunUsers getYunUser2(@QueryParam("id") String id){
+        return baseFacade.get(YunUsers.class,id);
+    }
+
     @POST
     @Path("userlogin")
     public Response userLogin(){
