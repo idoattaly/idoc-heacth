@@ -13,6 +13,7 @@ public class RoleVsUser {
     private String id;
     private String roleId;
     private String userId;
+    private String socialSecurityNumber;
 
     @Id
     @Column(name = "id")
@@ -44,6 +45,16 @@ public class RoleVsUser {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    @Basic
+    @Column(name = "social_security_number")
+    public String getSocialSecurityNumber() {
+        return socialSecurityNumber;
+    }
+
+    public void setSocialSecurityNumber(String socialSecurityNumber) {
+        this.socialSecurityNumber = socialSecurityNumber;
     }
 
     @Override
