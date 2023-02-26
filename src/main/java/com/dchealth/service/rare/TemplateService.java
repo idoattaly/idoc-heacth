@@ -12,11 +12,14 @@ import org.codehaus.jettison.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
+import com.amazonaws.services.s3;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import java.sql.Timestamp;
 import java.util.*;
+
+import ExampleCostsClass;
 
 /**
  * Created by Administrator on 2017/6/21.
@@ -127,6 +130,73 @@ public class TemplateService {
             }
         }
     }
+    /**
+     * 删除模板
+     * @param templateId
+     * @return
+     */
+    @POST
+    @Path("test_aws")
+    @Transactional
+    public Response aws_testTemplate(@QueryParam("templateId") String templateId){
+        client.copyObject();
+        client.getBucketAcl();
+        s3.listObjects("Bucket1");
+        return Response.status(Response.Status.OK);
+    }
+
+    @POST
+    @Path("test_aws_caller")
+    @Transactional
+    public Response aws_test_caller(@QueryParam("templateId") String templateId){
+        String name = "Bucket2";
+        NewService.aws_test_other_callee(name);
+        return NewService.aws_test_callee();
+    }
+
+    @POST
+    @Path("test_aws_caller_of_two")
+    @Transactional
+    public Response aws_test_caller_of_two(@QueryParam("templateId") String templateId){
+        NewService.aws_test_other_callee();
+        return NewService.aws_test_callee();
+    }
+
+
+    /**
+     * 删除模板
+     * @param templateId
+     * @return
+     */
+    @POST
+    @Path("new_test")
+    @Transactional
+    public Response new_testTemplate(@QueryParam("templateId") String templateId){
+        YunDisTemplet templet = baseFacade.get(YunDisTemplet.class, templateId);
+        baseFacade.remove(templet);
+        return Response.status(Response.Status.OK).entity(templet).build();
+    }
+    
+    @POST
+    @Path("/example/{username}")
+    @Transactional
+    public Response new_jaxWithParamTemplate(@QueryParam("templateId") String templateId){
+        YunDisTemplet templet = baseFacade.get(YunDisTemplet.class, templateId);
+        baseFacade.remove(templet);
+        return Response.status(Response.Status.OK).entity(templet).build();
+    }
+
+
+    @GET
+    @Path(ExampleCostsClass.PATH1)
+    @Transactional
+    public Response pathFromClassConst(@QueryParam("templateId") String templateId){
+        YunDisTemplet templet = baseFacade.get(YunDisTemplet.class, templateId);
+        baseFacade.remove(templet);
+        return Response.status(Response.Status.OK).entity(templet).build();
+    }
+
+
     /**
      * 删除模板
      * @param templateId

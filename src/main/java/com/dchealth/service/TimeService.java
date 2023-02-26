@@ -7,6 +7,7 @@ import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
@@ -61,5 +62,33 @@ public class TimeService {
     @RequiresPermissions("user:view")
     public Response getUser(){
         return Response.status(Response.Status.OK).entity(SecurityUtils.getSubject().getPrincipal()).build();
+    }
+
+     @GET
+    @Path("get-table")
+    @RequiresPermissions("user:view")
+    public Response getUser(@Validated YunUsers users){
+        return Response.status(Response.Status.OK).entity(SecurityUtils.getSubject().getPrincipal()).build();
+    }
+
+    @GET
+    @Path("get-nothing")
+    @RequiresPermissions("user:view")
+    public Response getNothing(){
+        return Response.status(Response.Status.OK).entity("nothing").build();
+    }
+
+    @GET
+    @Path("get-nothing_2")
+    @RequiresPermissions("user:view")
+    public Response getNothing(){
+        return Response.status(Response.Status.OK).entity("nothing_2").build();
+    }
+
+    @GET
+    @Path("get-nothing_3")
+    @RequiresPermissions("user:view")
+    public Response getNothing(){
+        return Response.status(Response.Status.OK).entity("nothing_3").build();
     }
 }
